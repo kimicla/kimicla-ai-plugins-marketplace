@@ -1,0 +1,9 @@
+{
+  "name": "local-ai-suite",
+  "version": "0.1.0",
+  "description": "A bundle of local OCR and Qwen tools, with a document-to-Java workflow.",
+  "author": { "name": "kimicla" },
+  "license": "MIT",
+  "dependencies": ["local-ocr", "local-qwen"],
+  "keywords": ["workflow", "java", "local-ai"]
+}

@@ -1,0 +1,16 @@
+{
+  "name": "local-ocr",
+  "version": "0.1.0",
+  "description": "GLM-OCR via the existing local :8080 gateway (Anthropic/OpenAI/Ollama API).",
+  "author": {
+    "name": "kimicla"
+  },
+  "license": "MIT",
+  "keywords": [
+    "ocr",
+    "pdf",
+    "local",
+    "local-gateway",
+    "mcp"
+  ]
+}
