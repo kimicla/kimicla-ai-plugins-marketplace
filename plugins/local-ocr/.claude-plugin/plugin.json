@@ -1,7 +1,7 @@
 {
   "name": "local-ocr",
-  "version": "0.1.0",
-  "description": "GLM-OCR via the existing local :8080 gateway (Anthropic/OpenAI/Ollama API).",
+  "version": "0.2.0",
+  "description": "OCR via Claude Code settings env; only LOCAL_OCR_MODEL differs from the main model.",
   "author": {
     "name": "kimicla"
   },

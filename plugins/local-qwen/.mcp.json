@@ -1,8 +1,0 @@
-{
-  "mcpServers": {
-    "local-qwen": {
-      "command": "${CLAUDE_PLUGIN_ROOT}/scripts/start.sh",
-      "args": []
-    }
-  }
-}

@@ -1,6 +1,6 @@
 {
   "name": "kimicla-ai-plugins",
-  "description": "Claude Code tools via an existing local model gateway on port 8080: GLM-OCR, Qwen review, Java workflow.",
+  "description": "Claude Code OCR MCP using the current Claude Code API gateway settings.",
   "owner": {
     "name": "kimicla"
   },
@@ -9,19 +9,7 @@
       "name": "local-ocr",
       "source": "./plugins/local-ocr",
       "description": "OCR images and scanned PDFs using an existing local GLM-OCR model gateway.",
-      "version": "0.1.0"
-    },
-    {
-      "name": "local-qwen",
-      "source": "./plugins/local-qwen",
-      "description": "Independent Qwen review through the existing local model gateway.",
-      "version": "0.1.0"
-    },
-    {
-      "name": "local-ai-suite",
-      "source": "./plugins/local-ai-suite",
-      "description": "Installs local OCR + Qwen and adds document-to-Java workflow.",
-      "version": "0.1.0"
+      "version": "0.2.0"
     }
   ]
 }

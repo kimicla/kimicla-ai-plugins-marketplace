@@ -23,14 +23,38 @@ MAX_PIXELS = 16_000_000
 MAX_OUTPUT = 40000
 
 
+def claude_settings_env() -> dict[str, str]:
+    """Read Claude Code user defaults, even when MCP subprocess inherits no env.
+
+    Environment variables passed to this subprocess take precedence. Reading this
+    local settings file is only a fallback and never changes Claude's own model.
+    """
+    config_dir = Path(os.environ.get("CLAUDE_CONFIG_DIR") or (Path.home() / ".claude"))
+    try:
+        settings = json.loads((config_dir / "settings.json").read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return {}
+    values = settings.get("env", {}) if isinstance(settings, dict) else {}
+    if not isinstance(values, dict):
+        return {}
+    return {k: v for k, v in values.items() if isinstance(k, str) and isinstance(v, str)}
+
+
 def config():
-    base = (os.getenv("LOCAL_AI_BASE_URL") or os.getenv("ANTHROPIC_BASE_URL")
+    defaults = claude_settings_env()
+
+    def env(name: str) -> str:
+        return os.environ.get(name) or defaults.get(name, "")
+
+    # Use exactly the same API base URL and token as Claude Code by default.
+    # Only the OCR model is different from Claude Code's primary model.
+    base = (env("LOCAL_AI_BASE_URL") or env("ANTHROPIC_BASE_URL")
             or "http://127.0.0.1:8080").rstrip("/")
-    style = os.getenv("LOCAL_AI_API_STYLE", "anthropic").lower().strip()
+    style = (env("LOCAL_AI_API_STYLE") or "anthropic").lower().strip()
     if style not in ("anthropic", "openai", "responses", "ollama"):
         raise ValueError("LOCAL_AI_API_STYLE must be anthropic, openai, responses or ollama")
-    model = os.getenv("LOCAL_OCR_MODEL", "GLM-OCR-4bit")
-    key = os.getenv("LOCAL_AI_API_KEY") or os.getenv("ANTHROPIC_AUTH_TOKEN") or "dummy"
+    model = env("LOCAL_OCR_MODEL") or "GLM-OCR-4bit"
+    key = env("LOCAL_AI_API_KEY") or env("ANTHROPIC_AUTH_TOKEN") or "dummy"
     return base, style, model, key
 
 
