@@ -52,6 +52,21 @@ Within a Claude Code project folder, place a nonsensitive example at `docs/examp
 
 For PDF, the tool renders up to 5 specified pages (`1-3`, `1,3,5`) and sends image blocks to the gateway. The tool can only read files inside the Claude project directory (or `LOCAL_AI_ALLOWED_DIR` when explicitly set), up to 25 MB per file.
 
+## Corporate Mac: certificate verification and Python version
+
+The MCP launcher uses `UV_SYSTEM_CERTS=true` by default so `uv` validates PyPI certificates against the macOS system trust store. This fixes the common `invalid peer certificate: UnknownIssuer` failure when an enterprise root CA is installed in Keychain. TLS verification **remains enabled**. The launcher also requests Python 3.10+ even if a terminal prompt shows Python 3.9.
+
+To verify outside Claude Code:
+
+```bash
+cd ~/.claude/plugins/marketplaces/kimicla-ai-plugins/plugins/local-ocr
+bash scripts/start.sh
+```
+
+After the one-time dependency installation, a quiet process waiting for MCP input is expected. Press Ctrl+C to exit. If it still fails with `UnknownIssuer`, confirm the corporate root CA is trusted in macOS Keychain or ask IT for the PEM CA bundle and configure `SSL_CERT_FILE` for uv; do not disable certificate verification. For an approved internal Python package index you can configure `UV_DEFAULT_INDEX`. If your environment blocks automatic Python downloads, install an approved Python 3.10+ (for example `brew install python@3.12`).
+
+Official docs: https://docs.astral.sh/uv/concepts/authentication/certificates/
+
 ## Troubleshooting CONNECTION_CLOSED
 
 This message generally means the MCP subprocess exited. It is separate from whether the gateway accepts GLM-OCR calls. Confirm `uv --version`, then test the plugin outside Claude Code:

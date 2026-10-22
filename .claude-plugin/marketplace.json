@@ -9,7 +9,7 @@
       "name": "local-ocr",
       "source": "./plugins/local-ocr",
       "description": "OCR images and scanned PDFs using an existing local GLM-OCR model gateway.",
-      "version": "0.2.0"
+      "version": "0.2.1"
     }
   ]
 }

@@ -22,6 +22,12 @@ ocr=importlib.util.module_from_spec(spec)
 spec.loader.exec_module(ocr)
 
 class OCRTests(unittest.TestCase):
+    def test_launcher_uses_platform_certificates_and_supported_python(self):
+        script=(ROOT/'plugins/local-ocr/scripts/start.sh').read_text()
+        self.assertIn('UV_SYSTEM_CERTS="${UV_SYSTEM_CERTS:-true}"',script)
+        self.assertIn("--python '>=3.10'",script)
+        self.assertNotIn('--allow-insecure-host',script)
+
     def test_manifest(self):
         catalog=json.loads((ROOT/'.claude-plugin/marketplace.json').read_text())
         self.assertEqual([p['name'] for p in catalog['plugins']],['local-ocr'])
