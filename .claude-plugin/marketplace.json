@@ -8,8 +8,8 @@
     {
       "name": "local-ocr",
       "source": "./plugins/local-ocr",
-      "description": "OCR from Claude main model or an optional local GLM-OCR gateway.",
-      "version": "0.3.1"
+      "description": "MCP OCR and local-only clipboard Skill (image never attached to main model).",
+      "version": "0.4.0"
     }
   ]
 }

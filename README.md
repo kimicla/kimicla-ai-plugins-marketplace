@@ -10,7 +10,53 @@ Single plugin: **`local-ocr@kimicla-ai-plugins`**, supporting an optional shared
 
 Claude Code's main model settings remain untouched. The OCR plugin calls the local GLM-OCR model **only when `LOCAL_BASE_URL` is configured**.
 
-## Routing behavior (v0.3.0)
+## Copy an image to the local OCR model without sending it to Copilot
+
+With Claude Code using Copilot Bridge at `:4141` and your local model server at
+`:8080`, **do not paste images as normal Claude Code message attachments**.
+The native attachment path can send image bytes to the primary model and fail
+if the Bridge/model does not support image input.
+
+Instead, copy a screenshot into the macOS clipboard (Control+Command+Shift+4),
+or copy an image from Preview/Finder. Then type this text command in Claude Code:
+
+```text
+/local-ocr:ocr-clipboard 帮我解释图片里的错误信息
+```
+
+The installed Skill runs a local command **before the main model sees its
+prompt**. It reads macOS clipboard image data, calls `LOCAL_BASE_URL` with
+`LOCAL_OCR_MODEL`, and injects **only the recognized text** into the
+conversation. Images are never attached by this Skill. The existing MCP
+`ocr_file` remains available for project files.
+
+Add to the existing `env` object in `~/.claude/settings.json`:
+
+```json
+"LOCAL_BASE_URL": "http://127.0.0.1:8080",
+"LOCAL_OCR_MODEL": "GLM-OCR-4bit"
+```
+
+The clipboard command requires an explicitly configured **loopback**
+`LOCAL_BASE_URL`; it will not fall back to the Copilot Bridge (`:4141`) or
+send images to a remote endpoint. The OCR result still flows as text to the
+main model via Claude Code, so use only company-approved content.
+
+The script requires macOS Swift (available via Apple Command Line Tools) and
+the existing `uv` launcher. A plugin update and Claude Code restart are
+required. Run this terminal check after copying an image:
+
+```bash
+cd ~/.claude/plugins/marketplaces/kimicla-ai-plugins/plugins/local-ocr
+bash scripts/start.sh clipboard
+```
+
+Successful execution prints OCR text only. Errors go to stderr. If you already
+pasted the original image attachment into the Claude Code message, remove it
+and use the text slash command instead. This is an **explicit** opt-in path:
+an MCP plugin cannot globally intercept native image paste.
+
+## Routing behavior (v0.4.0)
 
 Claude Code and the OCR MCP are two separate API callers. The OCR result
 always goes back to Claude Code as an MCP tool response; Claude Code then

@@ -16,4 +16,7 @@ fi
 # resolving Python dependencies. Can be overridden with UV_SYSTEM_CERTS=false.
 export UV_SYSTEM_CERTS="${UV_SYSTEM_CERTS:-true}"
 # Ignore an old pyenv 3.9 selected in the invoking shell; use Python >=3.10.
+if [[ "${1:-}" == "clipboard" ]]; then
+  exec "$UV_BIN" run --python '>=3.10' --no-project --with 'fastmcp>=2,<5' --with 'pypdfium2>=5,<6' --with 'Pillow>=11,<13' python "$HERE/clipboard.py"
+fi
 exec "$UV_BIN" run --python '>=3.10' --no-project --with 'fastmcp>=2,<5' --with 'pypdfium2>=5,<6' --with 'Pillow>=11,<13' python "$HERE/server.py"

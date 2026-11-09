@@ -22,6 +22,49 @@ ocr=importlib.util.module_from_spec(spec)
 spec.loader.exec_module(ocr)
 
 class OCRTests(unittest.TestCase):
+    def test_clipboard_skill_and_launcher(self):
+        skill = (ROOT/'plugins/local-ocr/skills/ocr-clipboard/SKILL.md').read_text()
+        self.assertIn('disable-model-invocation: true', skill)
+        self.assertIn('start.sh" clipboard', skill)
+        self.assertIn('!'+chr(96)+'bash ', skill)
+        self.assertTrue((ROOT/'plugins/local-ocr/scripts/clipboard.swift').is_file())
+        launcher = (ROOT/'plugins/local-ocr/scripts/start.sh').read_text()
+        self.assertIn('== "clipboard"', launcher)
+
+    def test_clipboard_never_falls_back_to_main_model(self):
+        path = ROOT/'plugins/local-ocr/clipboard.py'
+        spec = importlib.util.spec_from_file_location("clipboard", path)
+        module = importlib.util.module_from_spec(spec)
+        with patch.dict(sys.modules, {"server": ocr}):
+            spec.loader.exec_module(module)
+        with tempfile.TemporaryDirectory() as td, patch.dict(os.environ, {
+            "CLAUDE_CONFIG_DIR": td,
+            "ANTHROPIC_BASE_URL": "http://localhost:4141",
+            "ANTHROPIC_MODEL": "gpt-4.1",
+        }, clear=True):
+            with self.assertRaisesRegex(RuntimeError, "LOCAL_BASE_URL"):
+                module.validate_local_route()
+            with patch.object(module, "read_clipboard") as reader:
+                with self.assertRaises(RuntimeError):
+                    module.transcribe()
+                reader.assert_not_called()
+        with tempfile.TemporaryDirectory() as td, patch.dict(os.environ, {
+            "CLAUDE_CONFIG_DIR": td,
+            "LOCAL_BASE_URL": "https://example.com",
+        }, clear=True):
+            with self.assertRaisesRegex(RuntimeError, "loopback"):
+                module.validate_local_route()
+        with tempfile.TemporaryDirectory() as td, patch.dict(os.environ, {
+            "CLAUDE_CONFIG_DIR": td,
+            "LOCAL_BASE_URL": "http://127.0.0.1:8080",
+            "LOCAL_OCR_MODEL": "GLM-OCR-4bit",
+        }, clear=True):
+            self.assertEqual(module.validate_local_route(), "http://127.0.0.1:8080")
+            with patch.object(module, "read_clipboard", return_value=b"image"), \
+                 patch.object(ocr, "ocr_image", return_value="recognized") as called:
+                self.assertEqual(module.transcribe(), "recognized")
+                self.assertEqual(called.call_args.args[1], b"image")
+
     def test_launcher_uses_platform_certificates_and_supported_python(self):
         script=(ROOT/'plugins/local-ocr/scripts/start.sh').read_text()
         self.assertIn('UV_SYSTEM_CERTS="${UV_SYSTEM_CERTS:-true}"',script)

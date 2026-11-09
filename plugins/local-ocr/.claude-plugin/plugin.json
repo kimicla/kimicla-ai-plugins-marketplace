@@ -1,7 +1,7 @@
 {
   "name": "local-ocr",
-  "version": "0.3.1",
-  "description": "OCR MCP using shared LOCAL_BASE_URL for local models; Anthropic model fallback.",
+  "version": "0.4.0",
+  "description": "MCP OCR plus explicit local-only macOS clipboard image-to-text Skill.",
   "author": {
     "name": "kimicla"
   },
