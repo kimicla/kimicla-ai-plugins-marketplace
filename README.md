@@ -1,14 +1,14 @@
 # Claude Code OCR MCP Marketplace
 
-Single plugin: **`local-ocr@kimicla-ai-plugins`**, supporting an optional separate local GLM-OCR inference server.
+Single plugin: **`local-ocr@kimicla-ai-plugins`**, supporting an optional shared local-model inference server.
 
-**No duplicate model download required.** The OCR plugin reads inherited environment variables or `~/.claude/settings.json` (`$CLAUDE_CONFIG_DIR/settings.json` if configured). Process env takes precedence. With `LOCAL_OCR_BASE_URL` configured, GLM-OCR uses that endpoint; otherwise it uses Claude Code's Anthropic model.
+**No duplicate model download required.** The OCR plugin reads inherited environment variables or `~/.claude/settings.json` (`$CLAUDE_CONFIG_DIR/settings.json` if configured). Process env takes precedence. With `LOCAL_BASE_URL` configured, GLM-OCR uses that endpoint; otherwise it uses Claude Code's Anthropic model.
 
 - Claude Code main model: `ANTHROPIC_BASE_URL`, `ANTHROPIC_MODEL`, and `ANTHROPIC_AUTH_TOKEN`.
-- Local OCR (optional): `LOCAL_OCR_BASE_URL`, `LOCAL_OCR_MODEL` (default `GLM-OCR-4bit`), and optionally `LOCAL_OCR_API_KEY`.
+- Local OCR (optional): `LOCAL_BASE_URL`, `LOCAL_OCR_MODEL` (default `GLM-OCR-4bit`), and optionally `LOCAL_OCR_API_KEY`.
 - Both routes use Anthropic `/v1/messages` by default.
 
-Claude Code's main model settings remain untouched. The OCR plugin calls the local GLM-OCR model **only when `LOCAL_OCR_BASE_URL` is configured**.
+Claude Code's main model settings remain untouched. The OCR plugin calls the local GLM-OCR model **only when `LOCAL_BASE_URL` is configured**.
 
 ## Routing behavior (v0.3.0)
 
@@ -19,16 +19,16 @@ Copilot HTTP forwarding is needed.
 
 | Configuration | OCR request goes to | Model | Credential |
 | --- | --- | --- | --- |
-| `LOCAL_OCR_BASE_URL` **unset** | Claude Code's `ANTHROPIC_BASE_URL` (e.g. :4141) | `ANTHROPIC_MODEL` (vision required) | `ANTHROPIC_AUTH_TOKEN` / `ANTHROPIC_API_KEY` |
-| `LOCAL_OCR_BASE_URL` **set** | `LOCAL_OCR_BASE_URL` (e.g. :8080) | `LOCAL_OCR_MODEL` (default GLM-OCR-4bit) | `LOCAL_OCR_API_KEY` (default dummy; **never** Copilot token) |
+| `LOCAL_BASE_URL` **unset** | Claude Code's `ANTHROPIC_BASE_URL` (e.g. :4141) | `ANTHROPIC_MODEL` (vision required) | `ANTHROPIC_AUTH_TOKEN` / `ANTHROPIC_API_KEY` |
+| `LOCAL_BASE_URL` **set** | `LOCAL_BASE_URL` (e.g. :8080) | `LOCAL_OCR_MODEL` (default GLM-OCR-4bit) | `LOCAL_OCR_API_KEY` (default dummy; **never** Copilot token) |
 
 For your setup with Copilot Bridge on :4141 and oMLX on :8080, keep
-your existing Claude Code settings and **add only these OCR-specific keys**
+your existing Claude Code settings and **add these two keys**
 inside the existing `env` object:
 
 ```json
 {
-  "LOCAL_OCR_BASE_URL": "http://127.0.0.1:8080",
+  "LOCAL_BASE_URL": "http://127.0.0.1:8080",
   "LOCAL_OCR_MODEL": "GLM-OCR-4bit"
 }
 ```
@@ -39,13 +39,19 @@ requires OpenAI Chat Completions, add
 `"LOCAL_OCR_API_STYLE": "openai"`. Only if the local server requires its own
 token, add `LOCAL_OCR_API_KEY`; it will not receive Copilot credentials.
 
-**Important:** Without `LOCAL_OCR_BASE_URL`, the MCP does **not** try
+**Important:** Without `LOCAL_BASE_URL`, the MCP does **not** try
 `GLM-OCR-4bit` via Copilot. It invokes the configured main model with an image,
 which requires that main model/proxy support vision. If unavailable, OCR
 returns a clear error rather than silently falling back to another model.
-For this reason, always set `LOCAL_OCR_BASE_URL` when you intend to use
-the local GLM-OCR model. `LOCAL_AI_BASE_URL` remains a deprecated alias
-for older installations.
+For this reason, set `LOCAL_BASE_URL` when you intend to use the local GLM-OCR model.
+
+`LOCAL_BASE_URL` is intentionally **shared** by future local-model plugins
+(e.g. local ASR, embeddings, or auxiliary LLMs). Each plugin retains its own
+model selector such as `LOCAL_OCR_MODEL`.
+The previous `LOCAL_OCR_BASE_URL` and `LOCAL_AI_BASE_URL` are deprecated
+aliases supported for compatibility. Precedence is:
+`LOCAL_BASE_URL` → `LOCAL_OCR_BASE_URL` → `LOCAL_AI_BASE_URL`.
+Remove the older keys from your configuration once updated.
 
 Update the installed plugin:
 
@@ -81,7 +87,7 @@ Restart Claude Code, then run `/mcp` to see `local-ocr`. The single tool `ocr_fi
 
 ## Minimal configuration
 
-Keep your existing `~/.claude/settings.json`. To enable a **separate** local GLM-OCR model, add `LOCAL_OCR_BASE_URL` and `LOCAL_OCR_MODEL` under the existing `env` object, as shown in the Routing section above. If you omit `LOCAL_OCR_BASE_URL`, the tool calls your main Anthropic-compatible vision model instead. If the local model server uses another image API format, set `LOCAL_OCR_API_STYLE=openai`, `responses`, or `ollama` as needed.
+Keep your existing `~/.claude/settings.json`. To enable a **separate** local GLM-OCR model, add `LOCAL_BASE_URL` and `LOCAL_OCR_MODEL` under the existing `env` object, as shown in the Routing section above. If you omit `LOCAL_BASE_URL`, the tool calls your main Anthropic-compatible vision model instead. If the local model server uses another image API format, set `LOCAL_OCR_API_STYLE=openai`, `responses`, or `ollama` as needed.
 
 ## Try OCR
 

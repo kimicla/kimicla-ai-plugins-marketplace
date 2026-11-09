@@ -1,7 +1,7 @@
 {
   "name": "local-ocr",
-  "version": "0.3.0",
-  "description": "OCR MCP: use Claude Code vision by default, optional isolated GLM-OCR gateway.",
+  "version": "0.3.1",
+  "description": "OCR MCP using shared LOCAL_BASE_URL for local models; Anthropic model fallback.",
   "author": {
     "name": "kimicla"
   },

@@ -64,7 +64,7 @@ class OCRTests(unittest.TestCase):
                 "ANTHROPIC_BASE_URL": "http://localhost:4141",
                 "ANTHROPIC_AUTH_TOKEN": "copilot-secret",
                 "ANTHROPIC_MODEL": "gpt-4.1",
-                "LOCAL_OCR_BASE_URL": "http://localhost:8080",
+                "LOCAL_BASE_URL": "http://localhost:8080",
                 "LOCAL_OCR_MODEL": "GLM-OCR-4bit"
             }}))
             with patch.dict(os.environ, {"CLAUDE_CONFIG_DIR": td}, clear=True):
@@ -86,13 +86,38 @@ class OCRTests(unittest.TestCase):
                         "copilot-secret", str(request.call_args.args[2])
                     )
 
+    def test_old_local_base_url_is_still_supported(self):
+        with tempfile.TemporaryDirectory() as td, patch.dict(os.environ, {
+            "CLAUDE_CONFIG_DIR": td,
+            "LOCAL_OCR_BASE_URL": "http://localhost:8081",
+            "LOCAL_OCR_MODEL": "GLM-OCR-4bit",
+        }, clear=True):
+            self.assertEqual(
+                ocr.config(),
+                ("http://localhost:8081", "anthropic", "GLM-OCR-4bit", "dummy")
+            )
+
+    def test_generic_local_base_url_precedes_old_alias(self):
+        with tempfile.TemporaryDirectory() as td, patch.dict(os.environ, {
+            "CLAUDE_CONFIG_DIR": td,
+            "ANTHROPIC_BASE_URL": "http://localhost:4141",
+            "ANTHROPIC_MODEL": "gpt-4.1",
+            "LOCAL_BASE_URL": "http://localhost:8080",
+            "LOCAL_OCR_BASE_URL": "http://localhost:8081",
+            "LOCAL_AI_BASE_URL": "http://localhost:8082",
+        }, clear=True):
+            self.assertEqual(
+                ocr.config(),
+                ("http://localhost:8080", "anthropic", "GLM-OCR-4bit", "dummy")
+            )
+
     def test_local_api_key_and_style_override(self):
         with tempfile.TemporaryDirectory() as td, patch.dict(os.environ, {
             "CLAUDE_CONFIG_DIR": td,
             "ANTHROPIC_BASE_URL": "http://localhost:4141",
             "ANTHROPIC_MODEL": "gpt-4.1",
             "ANTHROPIC_AUTH_TOKEN": "copilot-secret",
-            "LOCAL_OCR_BASE_URL": "http://localhost:8080",
+            "LOCAL_BASE_URL": "http://localhost:8080",
             "LOCAL_OCR_API_KEY": "local-secret",
             "LOCAL_OCR_API_STYLE": "openai",
         }, clear=True):
@@ -143,7 +168,7 @@ class OCRTests(unittest.TestCase):
                    'ollama':{'response':'ok'}}
         for style,response in responses.items():
             with self.subTest(style=style),tempfile.TemporaryDirectory() as td:
-                with patch.dict(os.environ,{'CLAUDE_CONFIG_DIR':td,'LOCAL_OCR_BASE_URL':'http://127.0.0.1:8080','LOCAL_OCR_API_STYLE':style},clear=True):
+                with patch.dict(os.environ,{'CLAUDE_CONFIG_DIR':td,'LOCAL_BASE_URL':'http://127.0.0.1:8080','LOCAL_OCR_API_STYLE':style},clear=True):
                     with patch.object(ocr,'post_json',return_value=response):
                         self.assertEqual(ocr.ocr_image('Read',b'image'),'ok')
 

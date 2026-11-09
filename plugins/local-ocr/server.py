@@ -1,7 +1,7 @@
 """MCP OCR tool with optional, isolated local inference gateway.
 
-Without LOCAL_OCR_BASE_URL, use Claude Code's main Anthropic-compatible model.
-With LOCAL_OCR_BASE_URL, use the independent GLM-OCR gateway.
+Without LOCAL_BASE_URL, use Claude Code's main Anthropic-compatible model.
+With LOCAL_BASE_URL, use the shared local gateway with GLM-OCR selected by name.
 All recognized text returns to Claude Code as an MCP tool result.
 """
 from __future__ import annotations
@@ -44,19 +44,23 @@ def claude_settings_env() -> dict[str, str]:
 def config():
     """Resolve separate OCR inference only when explicitly enabled.
 
-    Without LOCAL_OCR_BASE_URL, OCR uses the *same* Anthropic-compatible
+    Without LOCAL_BASE_URL, OCR uses the *same* Anthropic-compatible
     endpoint, main model, and auth as Claude Code (for vision-capable models).
-    With LOCAL_OCR_BASE_URL, OCR uses the local gateway and LOCAL_OCR_MODEL.
-    Never forward Claude/Copilot credentials to the separate OCR gateway.
+    With LOCAL_BASE_URL, OCR uses the shared local model gateway and LOCAL_OCR_MODEL.
+    Never forward Claude/Copilot credentials to the local gateway.
     """
     defaults = claude_settings_env()
 
     def env(name: str) -> str:
         return os.environ.get(name) or defaults.get(name, "")
 
-    explicit_ocr_base = env("LOCAL_OCR_BASE_URL") or env("LOCAL_AI_BASE_URL")
-    if explicit_ocr_base:
-        base = explicit_ocr_base.rstrip("/")
+    # Shared across current and future local-model plugins. The former
+    # OCR-specific key is supported as an alias for existing installations.
+    explicit_local_base = (env("LOCAL_BASE_URL")
+                           or env("LOCAL_OCR_BASE_URL")
+                           or env("LOCAL_AI_BASE_URL"))
+    if explicit_local_base:
+        base = explicit_local_base.rstrip("/")
         style = (env("LOCAL_OCR_API_STYLE") or env("LOCAL_AI_API_STYLE")
                  or "anthropic").lower().strip()
         model = env("LOCAL_OCR_MODEL") or "GLM-OCR-4bit"
@@ -72,7 +76,7 @@ def config():
         if not model:
             raise ValueError(
                 "No local OCR endpoint and no Anthropic model configured. "
-                "Set LOCAL_OCR_BASE_URL to your OCR server or ANTHROPIC_MODEL "
+                "Set LOCAL_BASE_URL to your local model server or ANTHROPIC_MODEL "
                 "to a vision-capable main model."
             )
         key = env("ANTHROPIC_AUTH_TOKEN") or env("ANTHROPIC_API_KEY") or ""
