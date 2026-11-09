@@ -31,6 +31,24 @@ class OCRTests(unittest.TestCase):
         launcher = (ROOT/'plugins/local-ocr/scripts/start.sh').read_text()
         self.assertIn('== "clipboard"', launcher)
 
+    def test_loopback_ocr_disables_proxies_and_redirects(self):
+        from unittest.mock import MagicMock
+        opener = MagicMock()
+        response = MagicMock()
+        response.__enter__.return_value = response
+        opener.open.return_value = response
+        with patch.object(ocr.urllib.request, "build_opener",
+                          return_value=opener) as build, patch.object(
+                              ocr.json, "load", return_value={"ok": True}
+                          ):
+            self.assertEqual(
+                ocr.post_json("http://127.0.0.1:8080/v1/messages", {}, {}),
+                {"ok": True}
+            )
+        self.assertIsInstance(build.call_args.args[0], ocr.urllib.request.ProxyHandler)
+        self.assertEqual(build.call_args.args[0].proxies, {})
+        self.assertIsInstance(build.call_args.args[1], ocr.NoRedirect)
+
     def test_clipboard_never_falls_back_to_main_model(self):
         path = ROOT/'plugins/local-ocr/clipboard.py'
         spec = importlib.util.spec_from_file_location("clipboard", path)

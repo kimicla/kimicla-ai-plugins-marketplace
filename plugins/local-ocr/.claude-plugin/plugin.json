@@ -1,6 +1,6 @@
 {
   "name": "local-ocr",
-  "version": "0.4.0",
+  "version": "0.4.1",
   "description": "MCP OCR plus explicit local-only macOS clipboard image-to-text Skill.",
   "author": {
     "name": "kimicla"

@@ -37,6 +37,8 @@ Add to the existing `env` object in `~/.claude/settings.json`:
 "LOCAL_OCR_MODEL": "GLM-OCR-4bit"
 ```
 
+Loopback OCR requests bypass system HTTP proxies and reject redirects, so image bytes are not relayed to an unexpected endpoint.
+
 The clipboard command requires an explicitly configured **loopback**
 `LOCAL_BASE_URL`; it will not fall back to the Copilot Bridge (`:4141`) or
 send images to a remote endpoint. The OCR result still flows as text to the

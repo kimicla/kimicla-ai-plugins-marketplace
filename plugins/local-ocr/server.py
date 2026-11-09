@@ -14,6 +14,7 @@ import re
 import urllib.error
 import urllib.request
 from pathlib import Path
+from urllib.parse import urlsplit
 
 from fastmcp import FastMCP
 
@@ -132,11 +133,24 @@ def parse_pages(spec: str, total: int) -> list[int]:
     return pages
 
 
+class NoRedirect(urllib.request.HTTPRedirectHandler):
+    """Disallow redirects when sending potentially sensitive images locally."""
+
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        return None
+
+
 def post_json(url: str, payload: dict, headers: dict) -> dict:
     request = urllib.request.Request(
         url, data=json.dumps(payload).encode("utf-8"),
         headers={"Content-Type": "application/json", **headers}, method="POST")
     try:
+        if urlsplit(url).hostname in ("localhost", "127.0.0.1", "::1"):
+            # Do not use enterprise proxies or follow remote redirects.
+            opener = urllib.request.build_opener(
+                urllib.request.ProxyHandler({}), NoRedirect())
+            with opener.open(request, timeout=180) as response:
+                return json.load(response)
         with urllib.request.urlopen(request, timeout=180) as response:
             return json.load(response)
     except urllib.error.HTTPError as exc:
