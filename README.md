@@ -1,15 +1,62 @@
 # Claude Code OCR MCP Marketplace
 
-Single plugin: **`local-ocr@kimicla-ai-plugins`**, using the GLM-OCR model already available through the API gateway configured in your existing Claude Code settings.
+Single plugin: **`local-ocr@kimicla-ai-plugins`**, supporting an optional separate local GLM-OCR inference server.
 
-**No second model service, Ollama download, duplicate gateway URL or API token required.** The OCR plugin reads the inherited environment when present; otherwise it reads `~/.claude/settings.json` (`$CLAUDE_CONFIG_DIR/settings.json` if configured). Process env always takes precedence over the settings file. It uses:
+**No duplicate model download required.** The OCR plugin reads inherited environment variables or `~/.claude/settings.json` (`$CLAUDE_CONFIG_DIR/settings.json` if configured). Process env takes precedence. With `LOCAL_OCR_BASE_URL` configured, GLM-OCR uses that endpoint; otherwise it uses Claude Code's Anthropic model.
 
-- `ANTHROPIC_BASE_URL` for the gateway, e.g. `http://localhost:8080`.
-- `ANTHROPIC_AUTH_TOKEN` for the authentication token.
-- `LOCAL_OCR_MODEL` for the OCR model (defaults to `GLM-OCR-4bit`).
-- Anthropic `/v1/messages` by default, matching the primary Claude Code gateway API style.
+- Claude Code main model: `ANTHROPIC_BASE_URL`, `ANTHROPIC_MODEL`, and `ANTHROPIC_AUTH_TOKEN`.
+- Local OCR (optional): `LOCAL_OCR_BASE_URL`, `LOCAL_OCR_MODEL` (default `GLM-OCR-4bit`), and optionally `LOCAL_OCR_API_KEY`.
+- Both routes use Anthropic `/v1/messages` by default.
 
-The existing Claude Code `ANTHROPIC_MODEL` and `ANTHROPIC_DEFAULT_SONNET_MODEL` settings remain untouched: your main model keeps running normally. The OCR plugin calls the explicitly configured OCR model **only when invoked**.
+Claude Code's main model settings remain untouched. The OCR plugin calls the local GLM-OCR model **only when `LOCAL_OCR_BASE_URL` is configured**.
+
+## Routing behavior (v0.3.0)
+
+Claude Code and the OCR MCP are two separate API callers. The OCR result
+always goes back to Claude Code as an MCP tool response; Claude Code then
+sends that text to its primary model in the normal tool flow. No direct OCR ->
+Copilot HTTP forwarding is needed.
+
+| Configuration | OCR request goes to | Model | Credential |
+| --- | --- | --- | --- |
+| `LOCAL_OCR_BASE_URL` **unset** | Claude Code's `ANTHROPIC_BASE_URL` (e.g. :4141) | `ANTHROPIC_MODEL` (vision required) | `ANTHROPIC_AUTH_TOKEN` / `ANTHROPIC_API_KEY` |
+| `LOCAL_OCR_BASE_URL` **set** | `LOCAL_OCR_BASE_URL` (e.g. :8080) | `LOCAL_OCR_MODEL` (default GLM-OCR-4bit) | `LOCAL_OCR_API_KEY` (default dummy; **never** Copilot token) |
+
+For your setup with Copilot Bridge on :4141 and oMLX on :8080, keep
+your existing Claude Code settings and **add only these OCR-specific keys**
+inside the existing `env` object:
+
+```json
+{
+  "LOCAL_OCR_BASE_URL": "http://127.0.0.1:8080",
+  "LOCAL_OCR_MODEL": "GLM-OCR-4bit"
+}
+```
+
+Do not replace the whole `settings.json` file with this excerpt.
+The OCR plugin uses Anthropic `/v1/messages` by default. If oMLX instead
+requires OpenAI Chat Completions, add
+`"LOCAL_OCR_API_STYLE": "openai"`. Only if the local server requires its own
+token, add `LOCAL_OCR_API_KEY`; it will not receive Copilot credentials.
+
+**Important:** Without `LOCAL_OCR_BASE_URL`, the MCP does **not** try
+`GLM-OCR-4bit` via Copilot. It invokes the configured main model with an image,
+which requires that main model/proxy support vision. If unavailable, OCR
+returns a clear error rather than silently falling back to another model.
+For this reason, always set `LOCAL_OCR_BASE_URL` when you intend to use
+the local GLM-OCR model. `LOCAL_AI_BASE_URL` remains a deprecated alias
+for older installations.
+
+Update the installed plugin:
+
+```bash
+claude plugin marketplace update kimicla-ai-plugins
+claude plugin update local-ocr@kimicla-ai-plugins
+```
+
+Restart Claude Code, then run `/mcp` and test with a non-sensitive
+image in the current project. Verify :8080 logs show a GLM-OCR request, while
+the resulting text appears as an MCP tool result for the model on :4141.
 
 ## Install
 
@@ -34,15 +81,7 @@ Restart Claude Code, then run `/mcp` to see `local-ocr`. The single tool `ocr_fi
 
 ## Minimal configuration
 
-Keep your existing `~/.claude/settings.json`. Under its **existing** `env` object, only add (or retain):
-
-```json
-"LOCAL_OCR_MODEL": "GLM-OCR-4bit"
-```
-
-That's it. Do not create a separate MCP token or base URL. The plugin also accepts setting `LOCAL_OCR_MODEL` as a shell env variable for one session; the shell takes precedence. If you don't add it, `GLM-OCR-4bit` is already the built-in default. The model ID must match the model exposed by your gateway.
-
-If your gateway uses another image API format, optional `LOCAL_AI_API_STYLE=openai` (Chat Completions), `responses` (Responses API) or `ollama` is supported; the default is `anthropic` for `/v1/messages`. An existing text-only gateway is *not automatically* vision-capable: it must forward image data to GLM-OCR.
+Keep your existing `~/.claude/settings.json`. To enable a **separate** local GLM-OCR model, add `LOCAL_OCR_BASE_URL` and `LOCAL_OCR_MODEL` under the existing `env` object, as shown in the Routing section above. If you omit `LOCAL_OCR_BASE_URL`, the tool calls your main Anthropic-compatible vision model instead. If the local model server uses another image API format, set `LOCAL_OCR_API_STYLE=openai`, `responses`, or `ollama` as needed.
 
 ## Try OCR
 
@@ -79,7 +118,7 @@ bash plugins/local-ocr/scripts/start.sh
 
 **Normal behavior:** the MCP server waits on stdin; this is *not* a crash. **Failure:** Python import/uv errors are printed to stderr. The script checks Homebrew paths (`/opt/homebrew/bin/uv`, `/usr/local/bin/uv`) even if Claude Code started with a limited PATH.
 
-The proxy on `localhost:8080` must support the **multimodal** Anthropic `/v1/messages` endpoint for the default mode; `curl http://localhost:8080` alone is not a sufficient test of model/image support.
+The selected OCR backend must support image inputs in the chosen API format. A plain `curl http://localhost:8080` only checks server reachability, not vision capability.
 
 ## Development
 

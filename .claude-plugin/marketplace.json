@@ -1,6 +1,6 @@
 {
   "name": "kimicla-ai-plugins",
-  "description": "Claude Code OCR MCP using the current Claude Code API gateway settings.",
+  "description": "Claude Code OCR MCP with optional independent local GLM-OCR inference backend.",
   "owner": {
     "name": "kimicla"
   },
@@ -8,8 +8,8 @@
     {
       "name": "local-ocr",
       "source": "./plugins/local-ocr",
-      "description": "OCR images and scanned PDFs using an existing local GLM-OCR model gateway.",
-      "version": "0.2.1"
+      "description": "OCR from Claude main model or an optional local GLM-OCR gateway.",
+      "version": "0.3.0"
     }
   ]
 }

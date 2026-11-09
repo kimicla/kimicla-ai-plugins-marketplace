@@ -1,7 +1,8 @@
-"""MCP OCR tool using an existing local model gateway (default :8080).
+"""MCP OCR tool with optional, isolated local inference gateway.
 
-Accepts Anthropic Messages, OpenAI Chat Completions / Responses, or Ollama native.
-Does not start, download, or manage model weights.
+Without LOCAL_OCR_BASE_URL, use Claude Code's main Anthropic-compatible model.
+With LOCAL_OCR_BASE_URL, use the independent GLM-OCR gateway.
+All recognized text returns to Claude Code as an MCP tool result.
 """
 from __future__ import annotations
 
@@ -41,20 +42,45 @@ def claude_settings_env() -> dict[str, str]:
 
 
 def config():
+    """Resolve separate OCR inference only when explicitly enabled.
+
+    Without LOCAL_OCR_BASE_URL, OCR uses the *same* Anthropic-compatible
+    endpoint, main model, and auth as Claude Code (for vision-capable models).
+    With LOCAL_OCR_BASE_URL, OCR uses the local gateway and LOCAL_OCR_MODEL.
+    Never forward Claude/Copilot credentials to the separate OCR gateway.
+    """
     defaults = claude_settings_env()
 
     def env(name: str) -> str:
         return os.environ.get(name) or defaults.get(name, "")
 
-    # Use exactly the same API base URL and token as Claude Code by default.
-    # Only the OCR model is different from Claude Code's primary model.
-    base = (env("LOCAL_AI_BASE_URL") or env("ANTHROPIC_BASE_URL")
-            or "http://127.0.0.1:8080").rstrip("/")
-    style = (env("LOCAL_AI_API_STYLE") or "anthropic").lower().strip()
+    explicit_ocr_base = env("LOCAL_OCR_BASE_URL") or env("LOCAL_AI_BASE_URL")
+    if explicit_ocr_base:
+        base = explicit_ocr_base.rstrip("/")
+        style = (env("LOCAL_OCR_API_STYLE") or env("LOCAL_AI_API_STYLE")
+                 or "anthropic").lower().strip()
+        model = env("LOCAL_OCR_MODEL") or "GLM-OCR-4bit"
+        key = env("LOCAL_OCR_API_KEY") or env("LOCAL_AI_API_KEY") or "dummy"
+    else:
+        # Same backend and model as Claude Code; do not send a GLM model ID
+        # to a Copilot proxy that cannot serve it.
+        base = (env("ANTHROPIC_BASE_URL") or "https://api.anthropic.com").rstrip("/")
+        style = "anthropic"
+        model = (env("ANTHROPIC_MODEL")
+                 or env("ANTHROPIC_DEFAULT_SONNET_MODEL")
+                 or env("ANTHROPIC_DEFAULT_HAIKU_MODEL"))
+        if not model:
+            raise ValueError(
+                "No local OCR endpoint and no Anthropic model configured. "
+                "Set LOCAL_OCR_BASE_URL to your OCR server or ANTHROPIC_MODEL "
+                "to a vision-capable main model."
+            )
+        key = env("ANTHROPIC_AUTH_TOKEN") or env("ANTHROPIC_API_KEY") or ""
+
     if style not in ("anthropic", "openai", "responses", "ollama"):
-        raise ValueError("LOCAL_AI_API_STYLE must be anthropic, openai, responses or ollama")
-    model = env("LOCAL_OCR_MODEL") or "GLM-OCR-4bit"
-    key = env("LOCAL_AI_API_KEY") or env("ANTHROPIC_AUTH_TOKEN") or "dummy"
+        raise ValueError(
+            "LOCAL_OCR_API_STYLE must be anthropic, openai, responses or ollama"
+        )
     return base, style, model, key
 
 

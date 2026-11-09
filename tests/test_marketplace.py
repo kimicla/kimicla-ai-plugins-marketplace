@@ -37,36 +37,68 @@ class OCRTests(unittest.TestCase):
         self.assertIn('local-ocr',config['mcpServers'])
         self.assertTrue((ROOT/'plugins/local-ocr/scripts/start.sh').stat().st_mode & 0o100)
 
-    def test_default_without_settings(self):
-        with tempfile.TemporaryDirectory() as td,patch.dict(os.environ,{'CLAUDE_CONFIG_DIR':td},clear=True):
-            self.assertEqual(ocr.config(),('http://127.0.0.1:8080','anthropic','GLM-OCR-4bit','dummy'))
+    def test_missing_main_model_gives_actionable_error(self):
+        with tempfile.TemporaryDirectory() as td, patch.dict(
+            os.environ, {"CLAUDE_CONFIG_DIR": td}, clear=True
+        ):
+            with self.assertRaisesRegex(ValueError, "ANTHROPIC_MODEL"):
+                ocr.config()
 
-    def test_reads_claude_settings_without_process_env(self):
+    def test_no_local_url_uses_claude_model_and_token(self):
         with tempfile.TemporaryDirectory() as td:
-            Path(td,'settings.json').write_text(json.dumps({'env': {
-                'ANTHROPIC_BASE_URL':'http://localhost:8080',
-                'ANTHROPIC_AUTH_TOKEN':'internal-token',
-                'ANTHROPIC_MODEL':'Ornith-1-5-35B-A3B-MLX-4bit',
-                'LOCAL_OCR_MODEL':'GLM-OCR-4bit'}}))
-            with patch.dict(os.environ,{'CLAUDE_CONFIG_DIR':td},clear=True):
-                self.assertEqual(ocr.config(),('http://localhost:8080','anthropic','GLM-OCR-4bit','internal-token'))
+            Path(td, "settings.json").write_text(json.dumps({"env": {
+                "ANTHROPIC_BASE_URL": "http://localhost:4141",
+                "ANTHROPIC_AUTH_TOKEN": "copilot-token",
+                "ANTHROPIC_MODEL": "gpt-4.1",
+                "LOCAL_OCR_MODEL": "GLM-OCR-4bit"
+            }}))
+            with patch.dict(os.environ, {"CLAUDE_CONFIG_DIR": td}, clear=True):
+                self.assertEqual(
+                    ocr.config(),
+                    ("http://localhost:4141", "anthropic", "gpt-4.1", "copilot-token")
+                )
 
-    def test_process_env_takes_precedence(self):
+    def test_local_url_routes_to_ocr_and_never_copies_copilot_key(self):
         with tempfile.TemporaryDirectory() as td:
-            Path(td,'settings.json').write_text(json.dumps({'env':{
-                'ANTHROPIC_BASE_URL':'http://localhost:8080',
-                'ANTHROPIC_AUTH_TOKEN':'settings-token',
-                'LOCAL_OCR_MODEL':'wrong'}}))
-            with patch.dict(os.environ,{'CLAUDE_CONFIG_DIR':td,
-                                        'LOCAL_OCR_MODEL':'GLM-OCR-4bit',
-                                        'ANTHROPIC_AUTH_TOKEN':'shell-token'},clear=True):
-                self.assertEqual(ocr.config(),('http://localhost:8080','anthropic','GLM-OCR-4bit','shell-token'))
+            Path(td, "settings.json").write_text(json.dumps({"env": {
+                "ANTHROPIC_BASE_URL": "http://localhost:4141",
+                "ANTHROPIC_AUTH_TOKEN": "copilot-secret",
+                "ANTHROPIC_MODEL": "gpt-4.1",
+                "LOCAL_OCR_BASE_URL": "http://localhost:8080",
+                "LOCAL_OCR_MODEL": "GLM-OCR-4bit"
+            }}))
+            with patch.dict(os.environ, {"CLAUDE_CONFIG_DIR": td}, clear=True):
+                self.assertEqual(
+                    ocr.config(),
+                    ("http://localhost:8080", "anthropic", "GLM-OCR-4bit", "dummy")
+                )
+                with patch.object(ocr, "post_json", return_value={
+                    "content": [{"type": "text", "text": "identified text"}]
+                }) as request:
+                    self.assertEqual(
+                        ocr.ocr_image("Text Recognition:", b"img"), "identified text"
+                    )
+                    self.assertEqual(
+                        request.call_args.args[0], "http://localhost:8080/v1/messages"
+                    )
+                    self.assertEqual(request.call_args.args[1]["model"], "GLM-OCR-4bit")
+                    self.assertNotIn(
+                        "copilot-secret", str(request.call_args.args[2])
+                    )
 
-    def test_invalid_settings_fallback(self):
-        with tempfile.TemporaryDirectory() as td:
-            Path(td,'settings.json').write_text('{invalid')
-            with patch.dict(os.environ,{'CLAUDE_CONFIG_DIR':td},clear=True):
-                self.assertEqual(ocr.config()[2],'GLM-OCR-4bit')
+    def test_local_api_key_and_style_override(self):
+        with tempfile.TemporaryDirectory() as td, patch.dict(os.environ, {
+            "CLAUDE_CONFIG_DIR": td,
+            "ANTHROPIC_BASE_URL": "http://localhost:4141",
+            "ANTHROPIC_MODEL": "gpt-4.1",
+            "ANTHROPIC_AUTH_TOKEN": "copilot-secret",
+            "LOCAL_OCR_BASE_URL": "http://localhost:8080",
+            "LOCAL_OCR_API_KEY": "local-secret",
+            "LOCAL_OCR_API_STYLE": "openai",
+        }, clear=True):
+            self.assertEqual(ocr.config(), (
+                "http://localhost:8080", "openai", "GLM-OCR-4bit", "local-secret"
+            ))
 
     def test_read_scope(self):
         with tempfile.TemporaryDirectory() as allowed,tempfile.TemporaryDirectory() as outside:
@@ -88,19 +120,22 @@ class OCRTests(unittest.TestCase):
 
     def test_anthropic_payload_and_auth(self):
         with tempfile.TemporaryDirectory() as td:
-            Path(td,'settings.json').write_text(json.dumps({'env':{
-                'ANTHROPIC_BASE_URL':'http://localhost:8080',
-                'ANTHROPIC_AUTH_TOKEN':'secret',
-                'LOCAL_OCR_MODEL':'GLM-OCR-4bit'}}))
-            with patch.dict(os.environ,{'CLAUDE_CONFIG_DIR':td},clear=True):
-                def fake(url,payload,headers):
-                    self.assertEqual(url,'http://localhost:8080/v1/messages')
-                    self.assertEqual(headers['x-api-key'],'secret')
-                    self.assertEqual(payload['model'],'GLM-OCR-4bit')
-                    self.assertEqual(payload['messages'][0]['content'][1]['type'],'image')
-                    return {'content':[{'type':'text','text':'识别成功'}]}
-                with patch.object(ocr,'post_json',side_effect=fake):
-                    self.assertEqual(ocr.ocr_image('Text Recognition:',b'img'),'识别成功')
+            Path(td, "settings.json").write_text(json.dumps({"env": {
+                "ANTHROPIC_BASE_URL": "http://localhost:4141",
+                "ANTHROPIC_AUTH_TOKEN": "copilot-secret",
+                "ANTHROPIC_MODEL": "gpt-4.1"
+            }}))
+            with patch.dict(os.environ, {"CLAUDE_CONFIG_DIR": td}, clear=True):
+                def fake(url, payload, headers):
+                    self.assertEqual(url, "http://localhost:4141/v1/messages")
+                    self.assertEqual(headers["x-api-key"], "copilot-secret")
+                    self.assertEqual(payload["model"], "gpt-4.1")
+                    self.assertEqual(payload["messages"][0]["content"][1]["type"], "image")
+                    return {"content": [{"type": "text", "text": "识别成功"}]}
+                with patch.object(ocr, "post_json", side_effect=fake):
+                    self.assertEqual(
+                        ocr.ocr_image("Text Recognition:", b"img"), "识别成功"
+                    )
 
     def test_other_formats(self):
         responses={'openai':{'choices':[{'message':{'content':'ok'}}]},
@@ -108,7 +143,7 @@ class OCRTests(unittest.TestCase):
                    'ollama':{'response':'ok'}}
         for style,response in responses.items():
             with self.subTest(style=style),tempfile.TemporaryDirectory() as td:
-                with patch.dict(os.environ,{'CLAUDE_CONFIG_DIR':td,'LOCAL_AI_API_STYLE':style},clear=True):
+                with patch.dict(os.environ,{'CLAUDE_CONFIG_DIR':td,'LOCAL_OCR_BASE_URL':'http://127.0.0.1:8080','LOCAL_OCR_API_STYLE':style},clear=True):
                     with patch.object(ocr,'post_json',return_value=response):
                         self.assertEqual(ocr.ocr_image('Read',b'image'),'ok')
 

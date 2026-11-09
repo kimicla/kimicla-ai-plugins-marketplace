@@ -1,7 +1,7 @@
 {
   "name": "local-ocr",
-  "version": "0.2.1",
-  "description": "OCR via Claude Code settings env; only LOCAL_OCR_MODEL differs from the main model.",
+  "version": "0.3.0",
+  "description": "OCR MCP: use Claude Code vision by default, optional isolated GLM-OCR gateway.",
   "author": {
     "name": "kimicla"
   },
